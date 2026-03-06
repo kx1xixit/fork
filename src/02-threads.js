@@ -138,7 +138,8 @@ export function startAsyncThread(util, state, ctorRuntime) {
       if (globalThis.FORK_DEBUG) {
         console.log(
           '[Fork] New thread created — main script continues immediately.',
-          'Branch runs asynchronously starting at block:', branchBlockId
+          'Branch runs asynchronously starting at block:',
+          branchBlockId
         );
       }
       _trackThreadCompletion(runtime, newThread, () => {
@@ -175,14 +176,33 @@ export function startAsyncThread(util, state, ctorRuntime) {
  */
 function _trackThreadCompletion(runtime, thread, onDone) {
   const STATUS_DONE = 4; // Thread.STATUS_DONE in scratch-vm
+  // Guard against double-calling onDone (interval fires + watchdog fires
+  // within the same 100 ms window, or interval fires just as watchdog clears).
+  let doneCalled = false;
+  function finish() {
+    if (doneCalled) return;
+    doneCalled = true;
+    clearInterval(interval);
+    clearTimeout(watchdog);
+    onDone();
+  }
+
   // Poll at 100 ms — a lightweight interval that keeps the throttle slot
   // accurate without a public VM event for thread completion.  The
   // runtime.threads.includes() check is O(n) in the thread count, but typical
   // projects have well under 100 active threads so the cost is negligible.
   const interval = setInterval(() => {
     if (thread.status === STATUS_DONE || !runtime.threads.includes(thread)) {
-      clearInterval(interval);
-      onDone(); // releases the throttle slot; also logs via caller
+      finish();
     }
   }, 100);
+
+  // Watchdog: if the thread never completes (e.g. an infinite loop that isn't
+  // terminated by the VM), release the throttle slot after 5 s so future forks
+  // are not permanently blocked.  Matches the worker watchdog in 03-worker.js.
+  const THREAD_TIMEOUT_MS = 5000;
+  const watchdog = setTimeout(() => {
+    console.warn('[Fork] Thread watchdog fired after 5 s; releasing throttle slot.');
+    finish();
+  }, THREAD_TIMEOUT_MS);
 }

@@ -122,5 +122,8 @@ class ForkExtension {
   }
 }
 
-// Register the extension with the TurboWarp / Scratch runtime.
-Scratch.extensions.register(new ForkExtension());
+// Register the extension class so TurboWarp can call new ForkExtension(runtime),
+// injecting the VM runtime into the constructor as intended.  Passing the class
+// (rather than a pre-instantiated object) is the standard TurboWarp pattern for
+// extensions that need a reliable constructor-injected runtime reference.
+Scratch.extensions.register(ForkExtension);
