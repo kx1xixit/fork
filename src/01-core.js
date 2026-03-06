@@ -1,88 +1,113 @@
 /**
- * Core Extension Module
- * This is the main extension class that Scratch will register
- * Load this first (01-* naming convention)
+ * Fork Extension — Core Module
+ *
+ * Provides simple multithreading utilities for Scratch / TurboWarp projects.
+ * Two modes are supported via a single C-block ("run in [MODE] mode."):
+ *
+ *   normal — Forks the branch into a brand-new Scratch VM thread so the
+ *            enclosing script continues immediately without blocking.
+ *            Implemented in 02-threads.js.
+ *
+ *   math   — Serialises the branch blocks and dispatches them to an inline
+ *            Web Worker so CPU-intensive math runs off the main thread.
+ *            Implemented in 03-worker.js.
+ *
+ * Extension ID : kxFork
+ * Load order   : 01-core is concatenated first; 02 and 03 follow.
+ *                Because those modules export plain function declarations,
+ *                JavaScript hoisting makes them available here at call-time
+ *                even though they appear later in the built bundle.
  */
 
-// Import colorBlock from 02-example-module.js
-import { colorBlock } from './02-example-module.js';
+// These imports are stripped by the bundler; the exported functions are
+// available via hoisting after concatenation.
+import { startAsyncThread } from './02-threads.js';
+import { startWorkerThread } from './03-worker.js';
 
-class TurboWarpExtension {
-  constructor() {
-    this.runtime = null;
-  }
+/**
+ * Shared throttle state — prevents runaway thread / worker spawning.
+ * Passed by reference into each helper so limits are enforced globally.
+ */
+const forkState = {
+  /** Number of currently-running async Scratch threads forked by Fork. */
+  activeThreadCount: 0,
+  /** Hard cap on concurrent forked Scratch threads. */
+  maxThreads: 64,
+  /** Set of currently active Web Workers. */
+  activeWorkers: new Set(),
+  /** Hard cap on concurrent Web Workers. */
+  maxWorkers: 8,
+};
 
+class ForkExtension {
   /**
-   * Return extension info for Scratch
-   * This method is required by the Scratch extension protocol
+   * Return extension metadata and block definitions to TurboWarp.
+   * Required by the Scratch extension protocol.
    */
   getInfo() {
     return {
-      id: 'myTurboWarpExtension',
-      name: Scratch.translate('My Extension'),
-      color1: '#4CAF50',
-      color2: '#45a049',
-      color3: '#3d8b40',
-      menuIconURI: '',
-      blockIconURI: '',
+      id: 'kxFork',
+      name: Scratch.translate('Fork'),
+      // Teal brand colours
+      color1: '#009688',
+      color2: '#00796B',
+      color3: '#00695C',
       blocks: [
         {
-          opcode: 'helloWorld',
-          blockType: 'reporter',
-          text: Scratch.translate('hello world'),
-        },
-        {
-          opcode: 'add',
-          blockType: 'reporter',
-          text: Scratch.translate('[A] + [B]'),
+          /**
+           * C-block: "run in [MODE] mode."
+           *
+           * CONDITIONAL = a C-block that executes its branch once (if-style).
+           * The implementation intentionally does NOT call util.startBranch(),
+           * so the enclosing Scratch thread never waits for the inner blocks.
+           * Instead, the branch is handed off to a new thread or Web Worker.
+           */
+          opcode: 'runInMode',
+          blockType: Scratch.BlockType.CONDITIONAL,
+          text: Scratch.translate('run in [MODE] mode.'),
           arguments: {
-            A: {
-              type: 'number',
-              defaultValue: 0,
-            },
-            B: {
-              type: 'number',
-              defaultValue: 1,
+            MODE: {
+              type: Scratch.ArgumentType.STRING,
+              menu: 'MODE_MENU',
+              defaultValue: 'normal',
             },
           },
-        },
-        {
-          opcode: 'colorBlock',
-          blockType: 'reporter',
-          text: Scratch.translate('selected color [COLOR]'),
-          arguments: {
-            COLOR: {
-              type: 'color',
-              defaultValue: '#FF0000',
-            },
-          },
+          branchCount: 1,
         },
       ],
+      menus: {
+        // acceptReporters: false keeps the dropdown from accepting dynamic values.
+        MODE_MENU: {
+          acceptReporters: false,
+          items: ['normal', 'math'],
+        },
+      },
     };
   }
 
   /**
-   * Block implementation: Hello World
+   * Block handler for "run in [MODE] mode."
+   *
+   * Dispatches to the correct threading strategy based on MODE:
+   *   'normal' → startAsyncThread  (02-threads.js)
+   *   'math'   → startWorkerThread (03-worker.js)
+   *
+   * Neither helper calls util.startBranch(), so the current Scratch script
+   * continues executing without blocking on the forked work.
+   *
+   * @param {{ MODE: string }} args
+   * @param {object} util - Scratch block utility (thread / target / runtime)
    */
-  helloWorld() {
-    return 'hello world!';
-  }
-
-  /**
-   * Block implementation: Add
-   */
-
-  add(args) {
-    return Number(args.A) + Number(args.B);
-  }
-
-  /**
-   * Block implementation: Color Block (delegates to 02-example-module.js)
-   */
-  colorBlock(args) {
-    return colorBlock(args);
+  runInMode(args, util) {
+    const mode = args.MODE;
+    if (mode === 'math') {
+      startWorkerThread(util, forkState);
+    } else {
+      // Default: 'normal' async Scratch thread
+      startAsyncThread(util, forkState);
+    }
   }
 }
 
-// Register the extension
-Scratch.extensions.register(new TurboWarpExtension());
+// Register the extension with the TurboWarp / Scratch runtime.
+Scratch.extensions.register(new ForkExtension());

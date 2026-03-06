@@ -25,6 +25,27 @@ globalThis.Scratch = {
     },
   },
   translate: str => str,
+  // Enum stubs — values mirror the TurboWarp / scratch-vm constants.
+  BlockType: {
+    BOOLEAN: 'Boolean',
+    BUTTON: 'button',
+    COMMAND: 'command',
+    CONDITIONAL: 'conditional',
+    EVENT: 'event',
+    HAT: 'hat',
+    LOOP: 'loop',
+    REPORTER: 'reporter',
+  },
+  ArgumentType: {
+    ANGLE: 'angle',
+    BOOLEAN: 'Boolean',
+    COLOR: 'color',
+    NUMBER: 'number',
+    STRING: 'string',
+    MATRIX: 'matrix',
+    NOTE: 'note',
+    IMAGE: 'image',
+  },
 };
 
 require(BUILD_FILE);
