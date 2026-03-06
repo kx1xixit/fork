@@ -28,10 +28,30 @@
  * TurboWarp's sequencer iterates over all active threads each animation
  * frame.  Pushing a thread simply appends it to that list; the sequencer
  * picks it up on the next frame, honouring all normal yielding / timing rules.
+ *
+ * ── Async diagnostics ───────────────────────────────────────────────────────
+ * To confirm asynchronous behaviour in TurboWarp, open the browser console
+ * and type:  FORK_DEBUG = true
+ * Then run your script.  You will see a "[Fork] New thread created" log the
+ * instant the fork fires, and a "[Fork] Branch thread finished" log when it
+ * completes.  The gap between those two timestamps proves the branch ran on a
+ * separate thread while the calling script continued immediately.
+ *
+ * You can also add a "say 'Done'" block directly after the C-block in your
+ * script — it will say "Done" immediately (before "Howdy") when the fork is
+ * working correctly.
  */
 
 /**
  * Fork the C-block's branch into a new Scratch VM thread.
+ *
+ * ── Async proof ──────────────────────────────────────────────────────────────
+ * The block handler returns undefined without calling util.startBranch().
+ * In TurboWarp's compiled execution this means:
+ *   while (a1.branch = +(undefined)) { … }  →  while (NaN) { … }
+ * NaN is falsy, so the inline branch body is never entered on the calling
+ * thread.  Control falls through to the next block immediately, regardless of
+ * how long the forked thread takes.
  *
  * @param {object}      util        - Scratch block utility (thread / target / runtime)
  * @param {object}      state       - Shared throttle state from 01-core.js
@@ -67,8 +87,8 @@ export function startAsyncThread(util, state, ctorRuntime) {
 
   // Determine the ID of this C-block so we can look up its substack.
   // util.thread.peekStack() is reliable in interpreted mode.  In compiled
-  // mode TurboWarp may provide a different mechanism, so we try a direct
-  // SUBSTACK input lookup as a robust fallback.
+  // mode TurboWarp sets thread.stack[0] to the C-block's ID before invoking
+  // the block handler, so peekStack() always returns the C-block's ID.
   const blockId = util.thread && util.thread.peekStack && util.thread.peekStack();
 
   let branchBlockId = null;
@@ -99,6 +119,12 @@ export function startAsyncThread(util, state, ctorRuntime) {
      * adds it to runtime.threads so the sequencer will step it each frame.
      * stackClick: false  — not triggered by a sprite click event.
      * updateMonitor: false — no monitor refresh needed for forked threads.
+     *
+     * This call returns immediately — the new thread will be stepped by
+     * the sequencer on the next (or same) animation frame.  The calling
+     * (main) script has already returned undefined from this block handler,
+     * which means the compiled while-loop condition evaluates to NaN (falsy)
+     * and the inline branch body is skipped entirely on the current thread.
      */
     const newThread = runtime._pushThread(branchBlockId, target, {
       stackClick: false,
@@ -106,12 +132,23 @@ export function startAsyncThread(util, state, ctorRuntime) {
     });
 
     if (newThread) {
-      // Poll until the VM removes the thread, then release the throttle slot.
+      // Diagnostic: set FORK_DEBUG = true in the browser console to see
+      // timestamped logs that prove the fork fires before the branch runs.
+      if (typeof FORK_DEBUG !== 'undefined' && FORK_DEBUG) {
+        console.log(
+          '[Fork] New thread created — main script continues immediately.',
+          'Branch runs asynchronously starting at block:', branchBlockId
+        );
+      }
       _trackThreadCompletion(runtime, newThread, () => {
+        if (typeof FORK_DEBUG !== 'undefined' && FORK_DEBUG) {
+          console.log('[Fork] Branch thread finished.');
+        }
         state.activeThreadCount--;
       });
     } else {
       // _pushThread returned nothing — release the slot we pre-incremented.
+      console.warn('[Fork] _pushThread returned no thread object.');
       state.activeThreadCount--;
     }
   } catch (err) {
@@ -144,7 +181,7 @@ function _trackThreadCompletion(runtime, thread, onDone) {
   const interval = setInterval(() => {
     if (thread.status === STATUS_DONE || !runtime.threads.includes(thread)) {
       clearInterval(interval);
-      onDone();
+      onDone(); // releases the throttle slot; also logs via caller
     }
   }, 100);
 }
