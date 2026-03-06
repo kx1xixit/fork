@@ -1,41 +1,21 @@
-/**
- * Fork Extension — Core Module
- *
- * Provides simple multithreading utilities for Scratch / TurboWarp projects.
- * Two modes are supported via a single C-block ("run in [MODE] mode."):
- *
- *   normal — Forks the branch into a brand-new Scratch VM thread so the
- *            enclosing script continues immediately without blocking.
- *            Implemented in 02-threads.js.
- *
- *   math   — Serialises the branch blocks and dispatches them to an inline
- *            Web Worker so CPU-intensive math runs off the main thread.
- *            Implemented in 03-worker.js.
- *
- * Extension ID : kxFork
- * Load order   : 01-core is concatenated first; 02 and 03 follow.
- *                Because those modules export plain function declarations,
- *                JavaScript hoisting makes them available here at call-time
- *                even though they appear later in the built bundle.
- */
+// Fork Extension — Core Module (kxFork)
+// See docs/fork.md for full documentation.
 
 // These imports are stripped by the bundler; the exported functions are
 // available via hoisting after concatenation.
 import { startAsyncThread } from './02-threads.js';
 import { startWorkerThread } from './03-worker.js';
 
-/**
- * Shared throttle state — prevents runaway thread / worker spawning.
- * Passed by reference into each helper so limits are enforced globally.
- */
+// Shared throttle state — prevents runaway thread / worker spawning.
+// Passed by reference into each helper so limits are enforced globally.
 const forkState = {
-  /** Number of currently-running async Scratch threads forked by Fork. */
+  // Number of currently-running async Scratch threads forked by Fork.
   activeThreadCount: 0,
-  /** Hard cap on concurrent forked Scratch threads. */
+  // Hard cap on concurrent forked Scratch threads.
   maxThreads: 64,
-  /** Set of currently active Web Workers. */
+  // Set of currently active Web Workers.
   activeWorkers: new Set(),
-  /** Hard cap on concurrent Web Workers. */
+  // Hard cap on concurrent Web Workers.
   maxWorkers: 8,
 };
 
@@ -77,7 +57,7 @@ class ForkExtension {
            */
           opcode: 'runInMode',
           blockType: Scratch.BlockType.CONDITIONAL,
-          text: Scratch.translate('run in [MODE] mode.'),
+          text: Scratch.translate('run in [MODE] mode'),
           arguments: {
             MODE: {
               type: Scratch.ArgumentType.STRING,
