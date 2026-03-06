@@ -1,8 +1,8 @@
 {
-  "name": "My TurboWarp Extension",
-  "id": "myTurboWarpExtension",
+  "name": "Fork",
+  "id": "kxFork",
   "version": "1.0.0",
-  "description": "A custom extension for TurboWarp",
-  "author": "Your Name",
-  "license": "KBEC-1.0"
+  "description": "Multithreading utilities for Scratch — run blocks concurrently in async or WebWorker mode",
+  "author": "Fork",
+  "license": "KXEC-1.1"
 }
