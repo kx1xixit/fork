@@ -277,10 +277,12 @@ function _serialiseBlock(block, blockContainer) {
  * to the worker via postMessage, and the worker posts variable updates back.
  * The worker is terminated and its slot released after the reply is received.
  *
- * @param {object} util   - Scratch block utility (thread / target / runtime)
- * @param {object} state  - Shared throttle state from 01-core.js
+ * @param {object}      util        - Scratch block utility (thread / target / runtime)
+ * @param {object}      state       - Shared throttle state from 01-core.js
+ * @param {object|null} _ctorRuntime - Runtime from constructor (unused here but kept for
+ *                                    API symmetry with startAsyncThread)
  */
-export function startWorkerThread(util, state) {
+export function startWorkerThread(util, state, _ctorRuntime) {
   // Guard: respect the active-worker cap.
   if (state.activeWorkers.size >= state.maxWorkers) {
     console.warn(`[Fork] Worker limit reached (${state.maxWorkers}). Skipping fork.`);
@@ -299,11 +301,24 @@ export function startWorkerThread(util, state) {
     return;
   }
 
-  const blockId = util.thread.peekStack();
-  const target = util.thread.target;
+  const target = util.target || (util.thread && util.thread.target);
+  if (!target) return;
 
-  // Get the first block ID inside the C-block's branch.
-  const branchBlockId = target.blocks.getBranch(blockId, 1);
+  // Get the C-block's block ID and find its branch.
+  const blockId = util.thread && util.thread.peekStack && util.thread.peekStack();
+
+  let branchBlockId = null;
+  if (blockId) {
+    if (typeof target.blocks.getBranch === 'function') {
+      branchBlockId = target.blocks.getBranch(blockId, 1);
+    }
+    if (!branchBlockId) {
+      const block = typeof target.blocks.getBlock === 'function' && target.blocks.getBlock(blockId);
+      const substackInput = block && block.inputs && block.inputs['SUBSTACK'];
+      branchBlockId = substackInput ? substackInput.block : null;
+    }
+  }
+
   if (!branchBlockId) return; // Empty branch.
 
   // Serialise the branch into a plain object array for postMessage.

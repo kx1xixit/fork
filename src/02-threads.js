@@ -11,6 +11,19 @@
  * green flag clicked" hat had fired.  The forking script never calls
  * util.startBranch(), so it returns immediately without waiting.
  *
+ * ── Runtime resolution order ────────────────────────────────────────────────
+ * In TurboWarp, the runtime is most reliably accessed via:
+ *   1. The runtime injected into the extension constructor (passed in as ctorRuntime)
+ *   2. Scratch.vm.runtime    — TurboWarp exposes the VM as Scratch.vm
+ *   3. util.target.runtime   — standard scratch-vm path through the target
+ *
+ * Using only path 3 (util.thread.target.runtime) is fragile because in
+ * TurboWarp's compiled / warp mode the util object may be a lightweight
+ * proxy where target.runtime is undefined.  If that property access throws,
+ * the error would propagate out of the block handler and TurboWarp may fall
+ * back to executing the branch inline on the current thread — which is exactly
+ * the blocking behaviour the user reported.
+ *
  * ── How Scratch blocks are scheduled ────────────────────────────────────────
  * TurboWarp's sequencer iterates over all active threads each animation
  * frame.  Pushing a thread simply appends it to that list; the sequencer
@@ -20,44 +33,93 @@
 /**
  * Fork the C-block's branch into a new Scratch VM thread.
  *
- * @param {object} util   - Scratch block utility (provides thread / target / runtime)
- * @param {object} state  - Shared throttle state from 01-core.js
+ * @param {object}      util        - Scratch block utility (thread / target / runtime)
+ * @param {object}      state       - Shared throttle state from 01-core.js
+ * @param {object|null} ctorRuntime - Runtime injected via ForkExtension constructor
  */
-export function startAsyncThread(util, state) {
+export function startAsyncThread(util, state, ctorRuntime) {
   // Guard: respect the active-thread cap to prevent runaway spawning.
   if (state.activeThreadCount >= state.maxThreads) {
     console.warn(`[Fork] Async thread limit reached (${state.maxThreads}). Skipping fork.`);
     return;
   }
 
-  const blockId = util.thread.peekStack();
-  const target = util.thread.target;
-  const runtime = target.runtime;
+  // Resolve the Scratch VM runtime via multiple paths so the extension works
+  // in both TurboWarp's interpreted mode and its compiled / warp mode.
+  //   1. Runtime from the extension constructor (most reliable)
+  //   2. Scratch.vm.runtime (TurboWarp always exposes Scratch.vm)
+  //   3. util.target.runtime / util.thread.target.runtime (standard scratch-vm)
+  const target = util.target || (util.thread && util.thread.target);
+  const runtime =
+    ctorRuntime ||
+    (typeof Scratch !== 'undefined' && Scratch.vm && Scratch.vm.runtime) ||
+    (target && target.runtime);
 
-  // Retrieve the ID of the first block inside the C-block's branch (substack 1).
-  const branchBlockId = target.blocks.getBranch(blockId, 1);
+  if (!runtime || typeof runtime._pushThread !== 'function') {
+    console.warn('[Fork] Scratch runtime._pushThread is not available. Cannot create thread.');
+    return;
+  }
+
+  if (!target) {
+    console.warn('[Fork] Cannot resolve current target. Cannot create thread.');
+    return;
+  }
+
+  // Determine the ID of this C-block so we can look up its substack.
+  // util.thread.peekStack() is reliable in interpreted mode.  In compiled
+  // mode TurboWarp may provide a different mechanism, so we try a direct
+  // SUBSTACK input lookup as a robust fallback.
+  const blockId = util.thread && util.thread.peekStack && util.thread.peekStack();
+
+  let branchBlockId = null;
+
+  if (blockId) {
+    // Primary: standard scratch-vm API — getBranch(id, 1) returns the first
+    // block inside the SUBSTACK input of the C-block.
+    if (typeof target.blocks.getBranch === 'function') {
+      branchBlockId = target.blocks.getBranch(blockId, 1);
+    }
+
+    // Fallback: read the SUBSTACK input directly from the block object.
+    // This covers cases where getBranch uses different indexing or is absent.
+    if (!branchBlockId) {
+      const block = typeof target.blocks.getBlock === 'function' && target.blocks.getBlock(blockId);
+      const substackInput = block && block.inputs && block.inputs['SUBSTACK'];
+      branchBlockId = substackInput ? substackInput.block : null;
+    }
+  }
+
   if (!branchBlockId) return; // Empty branch — nothing to fork.
 
   state.activeThreadCount++;
 
-  /**
-   * runtime._pushThread creates a new Thread starting at branchBlockId and
-   * adds it to runtime.threads so the sequencer will step it each frame.
-   * stackClick: false  — not triggered by a sprite click event.
-   * updateMonitor: false — no monitor refresh needed for forked threads.
-   */
-  const newThread = runtime._pushThread(branchBlockId, target, {
-    stackClick: false,
-    updateMonitor: false,
-  });
-
-  if (newThread) {
-    // Poll until the VM removes the thread, then release the throttle slot.
-    _trackThreadCompletion(runtime, newThread, () => {
-      state.activeThreadCount--;
+  try {
+    /**
+     * runtime._pushThread creates a new Thread starting at branchBlockId and
+     * adds it to runtime.threads so the sequencer will step it each frame.
+     * stackClick: false  — not triggered by a sprite click event.
+     * updateMonitor: false — no monitor refresh needed for forked threads.
+     */
+    const newThread = runtime._pushThread(branchBlockId, target, {
+      stackClick: false,
+      updateMonitor: false,
     });
-  } else {
-    // _pushThread returned nothing — release the slot we pre-incremented.
+
+    if (newThread) {
+      // Poll until the VM removes the thread, then release the throttle slot.
+      _trackThreadCompletion(runtime, newThread, () => {
+        state.activeThreadCount--;
+      });
+    } else {
+      // _pushThread returned nothing — release the slot we pre-incremented.
+      state.activeThreadCount--;
+    }
+  } catch (err) {
+    // Swallow the error so it never propagates out of the block handler.
+    // Propagating an error can cause TurboWarp to execute the branch on the
+    // current thread as a fallback, which is the blocking behaviour we want
+    // to avoid.
+    console.warn('[Fork] Failed to start async thread:', err.message);
     state.activeThreadCount--;
   }
 }
