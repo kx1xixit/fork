@@ -14,7 +14,7 @@ Thank you for your interest in improving the Fork (`kxFork`) extension!
 ```bash
 git clone https://github.com/kx1xixit/fork.git
 cd fork
-npm install
+npm ci
 ```
 
 ### Build and test
@@ -58,8 +58,7 @@ All `name`/`text` strings inside `getInfo()` must use `Scratch.translate()`.
 
 ## Code style
 
-- ESLint and Prettier are pre-configured. Run `npm run format` before
-  committing.
+- Run `npm run format` before committing.
 - Scratch globals (`BlockType`, `ArgumentType`, `Scratch`) are available in
   `src/` without importing — the IIFE wrapper provides them at runtime.
 - Keep block handler methods free of side-effects on the Scratch thread.

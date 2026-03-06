@@ -1,4 +1,4 @@
-# Fork — `kxFork`
+# Introduction to Fork
 
 A TurboWarp/Scratch extension that adds a single C-block for running enclosed
 blocks **concurrently** with the rest of the script.
@@ -52,7 +52,7 @@ For a full technical reference see [`docs/fork.md`](docs/fork.md).
 ```bash
 git clone https://github.com/kx1xixit/fork.git
 cd fork
-npm install
+npm ci
 ```
 
 ### Common commands

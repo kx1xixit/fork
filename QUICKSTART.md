@@ -27,7 +27,7 @@ git clone https://github.com/kx1xixit/fork.git
 cd fork
 
 # 2. Install dependencies
-npm install
+npm ci
 
 # 3. Build the extension
 npm run build
