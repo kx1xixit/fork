@@ -1,239 +1,104 @@
-# TurboWarp Extension Template
+# Fork — `kxFork`
 
-A template repository for creating **TurboWarp/Scratch extensions** with CI/CD workflows and automated builds.
+A TurboWarp/Scratch extension that adds a single C-block for running enclosed
+blocks **concurrently** with the rest of the script.
 
-## Features
+## Block
 
-- **Modular Architecture**: Organize your extension code into separate files
-- **Automated Build System**: Combines multiple JS files from `/src/` into a single extension bundle
-- **CI/CD Workflows**: GitHub Actions for building, testing, and releasing
-- **Watch Mode**: Development mode with automatic rebuilding on file changes
-- **Linting & Formatting**: ESLint and Prettier pre-configured
-- **Release Automation**: Automatic release creation with build artifacts
-- **Scratch Extension Format**: Ready for TurboWarp or Scratch 3.0+ environments
+```text
+run in [normal ▼] mode
+┌──────────────────────┐
+│  … blocks …          │
+└──────────────────────┘
+```
 
-## Getting Started
+| Mode | Behaviour |
+|------|-----------|
+| `normal` | Forks the branch into a new Scratch VM thread. The calling script returns immediately; the branch runs on the next scheduler tick. |
+| `math` | Serialises the branch to JSON, runs it in an inline Web Worker, then syncs any variable changes back to the main thread. Suitable for CPU-intensive arithmetic that would otherwise block the UI. |
+
+## Throttle limits
+
+| Resource | Cap |
+|----------|-----|
+| Concurrent forked threads (`normal` mode) | 64 |
+| Concurrent Web Workers (`math` mode) | 8 |
+
+Both modes emit `console.warn` and skip the fork when their cap is reached.
+Both modes include a **5-second watchdog** that releases the slot automatically
+if the thread or worker never finishes.
+
+## Using the extension
+
+1. Download the latest `extension.js` from the [Releases](../../releases) page,
+   **or** build it yourself (see [Development](#development) below).
+2. Go to [turbowarp.org](https://turbowarp.org).
+3. Click **Add Extension → Load Custom Extension**.
+4. Upload or paste the URL of `extension.js`.
+5. The **Fork** category will appear in the block palette.
+
+For usage examples see [`docs/example.md`](docs/example.md).
+For a full technical reference see [`docs/fork.md`](docs/fork.md).
+
+## Development
 
 ### Prerequisites
 
-- Node.js 18+ or 20+
-- npm or yarn
-- TurboWarp or Scratch 3.0+ environment
+- Node.js 18+
+- npm
 
-### Installation
-
-1. Clone this repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-### Development
-
-#### Build the extension
+### Setup
 
 ```bash
-npm run build
+git clone https://github.com/kx1xixit/fork.git
+cd fork
+npm install
 ```
 
-This creates `build/extension.js` by combining all `.js` files from `src/`.
+### Common commands
 
-#### Watch mode (automatic rebuild on file changes)
+| Command | What it does |
+|---------|--------------|
+| `npm run build` | Compile `src/` → `build/extension.js` |
+| `npm run watch` | Rebuild automatically on file changes |
+| `npm run lint` | Run ESLint on `src/` |
+| `npm run format` | Auto-format `src/` with Prettier |
+| `npm run test` | Build and run the test suite |
+| `npm run validate` | Validate extension structure |
+| `npm run fullstack` | Format → lint → spellcheck → validate → build |
 
-```bash
-npm run watch
-```
-
-#### Lint your code
-
-```bash
-npm run lint
-```
-
-#### Format code
-
-```bash
-npm run format
-```
-
-## Project Structure
+### Project structure
 
 ```
-├── src/
-│   ├── manifest.json          # Extension metadata
-│   ├── 01-core.js             # Main extension class
-│   ├── 02-example-module.js   # Example helper code
-│   └── [other modules].js     # Add more modules here
-├── build/
-│   └── extension.js           # Generated output file
-├── scripts/
-│   └── build.js               # Build script
-└── Configuration files
+src/
+├── manifest.json   — Extension metadata (name, id, version, …)
+├── 01-core.js      — ForkExtension class, getInfo(), block dispatcher
+├── 02-threads.js   — Normal-mode async thread helper
+└── 03-worker.js    — Math-mode Web Worker helper
+
+build/
+└── extension.js    — Compiled output (do not edit)
+
+scripts/
+├── build.js        — Build script
+├── test.js         — Test runner
+└── validate.js     — Validates the compiled extension
+
+docs/
+├── fork.md         — Full technical documentation
+└── example.md      — Usage examples
 ```
 
-## How It Works
+## CI/CD
 
-### File Loading Order
-
-Files in `src/` are loaded in **alphabetical order** by the build script. Use numbered prefixes to control load order:
-
-- `01-core.js` - Main extension class (loaded first, must have `getInfo()` and block methods)
-- `02-helpers.js` - Helper functions and utilities
-- `03-utils.js` - Additional utilities
-- etc.
-
-### Extension Structure
-
-The generated `extension.js` includes:
-
-1. **Extension Header**: Generated from `src/manifest.json`
-2. **IIFE Wrapper**: `(function (Scratch) { ... })(Scratch)`
-3. **All Source Files**: Concatenated in alphabetical order
-4. **Extension Registration**: `Scratch.extensions.register(new YourExtension())`
-
-### Creating Blocks
-
-Add blocks to your extension's `getInfo()` method:
-
-```javascript
-class MyExtension {
-  getInfo() {
-    return {
-      id: 'myExtension',
-      name: 'My Extension',
-      color1: '#4CAF50',
-      blocks: [
-        {
-          opcode: 'myBlock',
-          blockType: 'reporter',
-          text: 'my block',
-        },
-      ],
-    };
-  }
-
-  myBlock() {
-    return 'Hello!';
-  }
-}
-```
-
-## Configuration
-
-### manifest.json
-
-Customize your extension metadata in `src/manifest.json`:
-
-```json
-{
-  "name": "My Extension",
-  "id": "myExtension",
-  "version": "1.0.0",
-  "description": "What does my extension do?",
-  "author": "Your Name",
-  "license": "MIT"
-}
-```
-
-The metadata is automatically inserted into the extension header:
-
-```javascript
-// Name: My Extension
-// ID: myExtension
-// Description: What does my extension do?
-// By: Your Name
-// license: MIT
-// Version 1.0.0
-```
-
-### ESLint & Prettier
-
-Edit `eslint.config.mjs` and `.prettierrc.json` to customize linting and formatting rules.
-
-## CI/CD Workflows
-
-### Build Workflow (`.github/workflows/ci.yml`)
-
-Automatically builds the extension on:
-
-- Push to `main`, `develop`, or `master` branches
-- Pull requests to these branches
-- Tests against Node.js 18.x and 20.x
-
-Artifacts are uploaded and available for download.
-
-### Release Workflow (`.github/workflows/cd.yml`)
-
-Automatically builds and releases the extension when you:
-
-1. Create a git tag: `git tag v1.0.0`
-2. Push the tag: `git push origin v1.0.0`
-
-The workflow will:
-
-- Build the extension
-- Create a GitHub release
-- Upload `build/extension.js` as a release asset
-
-## Installation in TurboWarp
-
-1. Build the extension: `npm run build`
-2. Go to [TurboWarp](https://turbowarp.org)
-3. Click "Add Extension" → "Load Custom Extension"
-4. Paste the URL or upload `build/extension.js` file
-5. The extension blocks will appear in the editor
-
-### For Local Testing
-
-To test locally during development, you can use a fork of TurboWarp that loads extensions from a local server:
-
-1. Build: `npm run build`
-2. Start a local HTTP server
-3. Load from `http://localhost:PORT/build/extension.js`
-
-## Tips
-
-- **Development**: Use `npm run watch` while developing to automatically rebuild on changes
-- **Testing**: Load the extension in TurboWarp's "Load Custom Extension" dialog
-- **Versioning**: Update `version` in `src/manifest.json` when releasing new versions
-- **Block Colors**: Use hex colors in `getInfo()` for `color1`, `color2`, `color3`
-- **Block Types**: Use `'reporter'`, `'command'`, `'boolean'`, `'hat'`, or `'conditional'`
-
-## Troubleshooting
-
-### Extension doesn't load
-
-- Check browser console for error messages
-- Verify the extension ID is unique
-- Ensure syntax is valid: run `npm run lint`
-
-### Changes not reflected
-
-- Run `npm run build` to rebuild if not in watch mode
-- Hard refresh TurboWarp (Ctrl+Shift+R)
-- For block changes: reload extension via "Load Custom Extension"
-
-### Build errors
-
-- Check that all `.js` files in `src/` have valid JavaScript syntax
-- Run `npm run lint` to find potential issues
-- Ensure manifest.json is valid JSON
-
-## Example Extensions
-
-This template includes example code. To see it in action:
-
-1. Run `npm run build`
-2. Load `build/extension.js` into TurboWarp
-3. Look for "My Extension" in the extensions menu
-4. Use the example blocks
-
-## License
-
-MIT
+- **CI** (`ci.yml`) — Builds and tests on every push / pull request.
+- **CD** (`cd.yml`) — Creates a GitHub Release and uploads `extension.js`
+  automatically when a tag such as `v1.0.0` is pushed.
 
 ## Contributing
 
-Feel free to use this template as a starting point for your own TurboWarp/Scratch extensions!
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-For questions or improvements, open an issue or pull request.
+## License
+
+KXEC-1.1 — see [LICENSE](LICENSE).
