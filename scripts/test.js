@@ -21,10 +21,34 @@ let registeredExtension = null;
 globalThis.Scratch = {
   extensions: {
     register: ext => {
-      registeredExtension = ext;
+      // Support both class constructors and pre-instantiated objects.
+      // When a class is passed, instantiate it — this mirrors TurboWarp's own
+      // behaviour when Scratch.extensions.register(MyExtensionClass) is called.
+      registeredExtension = (typeof ext === 'function') ? new ext() : ext;
     },
   },
   translate: str => str,
+  // Enum stubs — values mirror the TurboWarp / scratch-vm constants.
+  BlockType: {
+    BOOLEAN: 'Boolean',
+    BUTTON: 'button',
+    COMMAND: 'command',
+    CONDITIONAL: 'conditional',
+    EVENT: 'event',
+    HAT: 'hat',
+    LOOP: 'loop',
+    REPORTER: 'reporter',
+  },
+  ArgumentType: {
+    ANGLE: 'angle',
+    BOOLEAN: 'Boolean',
+    COLOR: 'color',
+    NUMBER: 'number',
+    STRING: 'string',
+    MATRIX: 'matrix',
+    NOTE: 'note',
+    IMAGE: 'image',
+  },
 };
 
 require(BUILD_FILE);

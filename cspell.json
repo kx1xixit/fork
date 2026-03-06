@@ -8,5 +8,20 @@
   "ignorePaths": [
     "node_modules",
     "dist"
+  ],
+  "words": [
+    "mathop",
+    "setvariableto",
+    "changevariableby",
+    "kxFork",
+    "TurboWarp",
+    "pushThread",
+    "startBranch",
+    "peekStack",
+    "postMessage",
+    "serialise",
+    "serialised",
+    "serialises",
+    "serialising"
   ]
 }
