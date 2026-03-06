@@ -59,8 +59,9 @@ All `name`/`text` strings inside `getInfo()` must use `Scratch.translate()`.
 ## Code style
 
 - Run `npm run format` before committing.
-- Scratch globals (`BlockType`, `ArgumentType`, `Scratch`) are available in
-  `src/` without importing — the IIFE wrapper provides them at runtime.
+- Scratch APIs are exposed via the `Scratch` namespace in the IIFE wrapper.
+  Use `Scratch.BlockType` / `Scratch.ArgumentType` or destructure them with
+  `const {BlockType, ArgumentType} = Scratch;` instead of assuming globals.
 - Keep block handler methods free of side-effects on the Scratch thread.
 
 ## Releasing a new version

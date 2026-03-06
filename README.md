@@ -14,7 +14,7 @@ run in [normal ▼] mode
 
 | Mode | Behaviour |
 |------|-----------|
-| `normal` | Forks the branch into a new Scratch VM thread. The calling script returns immediately; the branch runs on the next scheduler tick. |
+| `normal` | Forks the branch into a new Scratch VM thread. The calling script returns immediately; the branch runs asynchronously on a later scheduler step. |
 | `math` | Serialises the branch to JSON, runs it in an inline Web Worker, then syncs any variable changes back to the main thread. Suitable for CPU-intensive arithmetic that would otherwise block the UI. |
 
 ## Throttle limits

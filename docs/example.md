@@ -33,10 +33,9 @@ Play a sound effect while an animation runs without pausing the main script.
 ```text
 when green flag clicked
 run in [normal v] mode
-┌──────────────────────┐
-│ play sound [pop v]   │
-│ wait until <done?>   │
-└──────────────────────┘
+┌───────────────────────────────┐
+│ play sound [pop v] until done │
+└───────────────────────────────┘
 move (10) steps        ← executes immediately, doesn't wait for sound
 ```
 
@@ -70,8 +69,8 @@ has already appeared — the UI was never blocked.
   ```javascript
   globalThis.FORK_DEBUG = true;
   ```
-  You will see timestamped `[Fork] New thread created` /
-  `[Fork] Branch thread finished` log lines.
+  You will see console log messages prefixed with `[Fork]` that describe
+  when forked threads are created and when their branches finish.
 
 ---
 
