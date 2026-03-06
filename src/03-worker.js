@@ -30,11 +30,15 @@ function scratchCompare(a, b) {
   var na = Number(a), nb = Number(b);
   // Empty string coerces to 0 via Number(), but Scratch does not treat it
   // as numeric.  Match Scratch VM's explicit empty-string guard.
-  if (na === 0 && a === '') return String(a).toLowerCase() < String(b).toLowerCase() ? -1 : String(a).toLowerCase() > String(b).toLowerCase() ? 1 : 0;
-  if (nb === 0 && b === '') return String(a).toLowerCase() < String(b).toLowerCase() ? -1 : String(a).toLowerCase() > String(b).toLowerCase() ? 1 : 0;
+  if (na === 0 && a === '') return compareStringsCI(a, b);
+  if (nb === 0 && b === '') return compareStringsCI(a, b);
   if (!isNaN(na) && !isNaN(nb)) {
     return na < nb ? -1 : na > nb ? 1 : 0;
   }
+  return compareStringsCI(a, b);
+}
+
+function compareStringsCI(a, b) {
   var sa = String(a).toLowerCase(), sb = String(b).toLowerCase();
   return sa < sb ? -1 : sa > sb ? 1 : 0;
 }
@@ -144,6 +148,11 @@ function evalBlock(block, vars) {
     // String
     case 'operator_join':   return String(resolve('STRING1')) + String(resolve('STRING2'));
     case 'operator_length': return String(resolve('STRING')).length;
+    case 'operator_letter_of': {
+      var str = String(resolve('STRING'));
+      var idx = Number(resolve('LETTER')) - 1; // Scratch uses 1-based indexing
+      return idx >= 0 && idx < str.length ? str.charAt(idx) : '';
+    }
 
     // Variable opcodes — key by variable ID (Scratch VM field has both .id
     // and .value/.name; fall back to .value when .id is absent).

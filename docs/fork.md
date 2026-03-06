@@ -5,7 +5,7 @@ rest of the script.
 
 ## Block
 
-```
+```text
 run in [normal ▼] mode
 ```
 
