@@ -1,46 +1,5 @@
-/**
- * Fork Extension — Normal Thread Module
- *
- * Implements "normal mode": runs the C-block's branch as a brand-new Scratch
- * thread inside the TurboWarp / Scratch VM scheduler.
- *
- * ── How threads are created ─────────────────────────────────────────────────
- * runtime._pushThread(startBlockId, target) inserts a new Thread object into
- * the VM's thread list.  On the very next scheduler tick the VM will begin
- * stepping through blocks starting at startBlockId — exactly as if a "When
- * green flag clicked" hat had fired.  The forking script never calls
- * util.startBranch(), so it returns immediately without waiting.
- *
- * ── Runtime resolution order ────────────────────────────────────────────────
- * In TurboWarp, the runtime is most reliably accessed via:
- *   1. The runtime injected into the extension constructor (passed in as ctorRuntime)
- *   2. Scratch.vm.runtime    — TurboWarp exposes the VM as Scratch.vm
- *   3. util.target.runtime   — standard scratch-vm path through the target
- *
- * Using only path 3 (util.thread.target.runtime) is fragile because in
- * TurboWarp's compiled / warp mode the util object may be a lightweight
- * proxy where target.runtime is undefined.  If that property access throws,
- * the error would propagate out of the block handler and TurboWarp may fall
- * back to executing the branch inline on the current thread — which is exactly
- * the blocking behaviour the user reported.
- *
- * ── How Scratch blocks are scheduled ────────────────────────────────────────
- * TurboWarp's sequencer iterates over all active threads each animation
- * frame.  Pushing a thread simply appends it to that list; the sequencer
- * picks it up on the next frame, honouring all normal yielding / timing rules.
- *
- * ── Async diagnostics ───────────────────────────────────────────────────────
- * To confirm asynchronous behaviour in TurboWarp, open the browser console
- * and type:  globalThis.FORK_DEBUG = true
- * Then run your script.  You will see a "[Fork] New thread created" log the
- * instant the fork fires, and a "[Fork] Branch thread finished" log when it
- * completes.  The gap between those two timestamps proves the branch ran on a
- * separate thread while the calling script continued immediately.
- *
- * You can also add a "say 'Done'" block directly after the C-block in your
- * script — it will say "Done" immediately (before "Howdy") when the fork is
- * working correctly.
- */
+// Fork Extension — Normal Thread Module
+// See docs/fork.md for full documentation.
 
 /**
  * Fork the C-block's branch into a new Scratch VM thread.

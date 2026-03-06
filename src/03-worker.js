@@ -1,28 +1,5 @@
-/**
- * Fork Extension — Web Worker Module
- *
- * Implements "math mode": serialises the C-block's branch and dispatches it
- * to an inline Web Worker so that CPU-intensive computation does not freeze
- * the main Scratch runtime.
- *
- * ── How worker communication works ──────────────────────────────────────────
- * 1. The branch blocks are walked from the Scratch VM block container and
- *    converted to a plain JSON-serialisable array by _serialiseBlocks().
- * 2. An inline Worker is created from a Blob URL (no extra file needed).
- * 3. The serialised block list plus a variable snapshot are sent via
- *    postMessage() to the worker.
- * 4. The worker evaluates each block using its own mini-interpreter that
- *    handles standard Scratch math / logic opcodes.
- * 5. When done the worker postMessages { variables } back, and the main
- *    thread applies any updated values to the live Scratch target.
- * 6. The Worker is terminated and retained resources are freed.
- *
- * ── How Scratch blocks are scheduled ────────────────────────────────────────
- * The current Scratch thread does NOT call util.startBranch(), so it returns
- * immediately.  The Worker runs in a separate OS thread; postMessage is the
- * sole communication channel — no shared memory is used — so the Scratch
- * sequencer is never blocked.
- */
+// Fork Extension — Web Worker Module
+// See docs/fork.md for full documentation.
 
 // ---------------------------------------------------------------------------
 // Inline Worker source
