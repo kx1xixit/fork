@@ -4,5 +4,5 @@
   "version": "1.0.0",
   "description": "Multithreading utilities for Scratch — run blocks concurrently in async or WebWorker mode",
   "author": "Fork",
-  "license": "MIT"
+  "license": "KXEC-1.1"
 }
