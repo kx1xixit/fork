@@ -31,7 +31,7 @@
  *
  * ── Async diagnostics ───────────────────────────────────────────────────────
  * To confirm asynchronous behaviour in TurboWarp, open the browser console
- * and type:  FORK_DEBUG = true
+ * and type:  globalThis.FORK_DEBUG = true
  * Then run your script.  You will see a "[Fork] New thread created" log the
  * instant the fork fires, and a "[Fork] Branch thread finished" log when it
  * completes.  The gap between those two timestamps proves the branch ran on a
@@ -132,16 +132,17 @@ export function startAsyncThread(util, state, ctorRuntime) {
     });
 
     if (newThread) {
-      // Diagnostic: set FORK_DEBUG = true in the browser console to see
-      // timestamped logs that prove the fork fires before the branch runs.
-      if (typeof FORK_DEBUG !== 'undefined' && FORK_DEBUG) {
+      // Diagnostic: set globalThis.FORK_DEBUG = true in the browser console
+      // to enable timestamped logs that prove the fork fires before the branch
+      // runs.  Uses globalThis to avoid ESLint no-undef on a bare identifier.
+      if (globalThis.FORK_DEBUG) {
         console.log(
           '[Fork] New thread created — main script continues immediately.',
           'Branch runs asynchronously starting at block:', branchBlockId
         );
       }
       _trackThreadCompletion(runtime, newThread, () => {
-        if (typeof FORK_DEBUG !== 'undefined' && FORK_DEBUG) {
+        if (globalThis.FORK_DEBUG) {
           console.log('[Fork] Branch thread finished.');
         }
         state.activeThreadCount--;
