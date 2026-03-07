@@ -1,7 +1,7 @@
 {
   "name": "Fork",
   "id": "kxFork",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Multithreading utilities for Scratch — run blocks concurrently in async or WebWorker mode",
   "author": "Fork",
   "license": "KXEC-1.1"
