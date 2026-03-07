@@ -21,10 +21,7 @@ let registeredExtension = null;
 globalThis.Scratch = {
   extensions: {
     register: ext => {
-      // Support both class constructors and pre-instantiated objects.
-      // When a class is passed, instantiate it — this mirrors TurboWarp's own
-      // behaviour when Scratch.extensions.register(MyExtensionClass) is called.
-      registeredExtension = (typeof ext === 'function') ? new ext() : ext;
+      registeredExtension = ext;
     },
   },
   translate: str => str,
@@ -58,16 +55,23 @@ console.log('Runtime check passed.');
 const size = (fs.statSync(BUILD_FILE).size / 1024).toFixed(2);
 console.log(`Bundle size:   ${size} KB`);
 
-// Report block count via getInfo()
-if (registeredExtension && typeof registeredExtension.getInfo === 'function') {
-  try {
-    const info = registeredExtension.getInfo();
-    const blockCount = info?.blocks?.length ?? 0;
-    console.log(`Blocks:        ${blockCount} (extension id: ${info?.id})`);
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    console.error(`Could not call getInfo() on registered extension: ${detail}`);
-  }
-} else {
-  console.warn('Could not retrieve block info from registered extension.');
+// Verify getInfo() is callable and returns valid metadata — fail hard so CI
+// catches the constructor-vs-instance regression (registering a class instead
+// of an instance makes getInfo unreachable on the registered object).
+if (!registeredExtension || typeof registeredExtension.getInfo !== 'function') {
+  console.error(
+    'FAIL: registered extension has no getInfo() method.' +
+      ' The extension may have been registered as a class constructor instead of an instance.'
+  );
+  process.exit(1);
+}
+
+try {
+  const info = registeredExtension.getInfo();
+  const blockCount = info?.blocks?.length ?? 0;
+  console.log(`Blocks:        ${blockCount} (extension id: ${info?.id})`);
+} catch (err) {
+  const detail = err instanceof Error ? err.message : String(err);
+  console.error(`FAIL: getInfo() threw an error: ${detail}`);
+  process.exit(1);
 }
