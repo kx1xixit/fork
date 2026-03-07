@@ -21,13 +21,13 @@ const forkState = {
 
 class ForkExtension {
   /**
-   * TurboWarp / scratch-vm calls new ForkExtension(runtime) when loading the
-   * extension, injecting the VM runtime directly.  Storing it here ensures
-   * block handlers always have a reliable runtime reference even in execution
-   * contexts where util.thread.target.runtime is unavailable (e.g. TurboWarp
-   * compiled / warp mode).
+   * Optional runtime reference, populated only when a caller passes one
+   * explicitly.  Because the extension is registered as a pre-instantiated
+   * object (see bottom of this file), TurboWarp never injects a runtime here.
+   * Block handlers fall back to Scratch.vm.runtime / util.target.runtime at
+   * call-time instead.
    *
-   * @param {object} runtime - The Scratch VM runtime instance
+   * @param {object} [runtime] - Optional Scratch VM runtime instance
    */
   constructor(runtime) {
     this._runtime = runtime || null;
